@@ -12,3 +12,7 @@
 *.keystore
 *.jks
 keystore.properties
+
+# Release signing key and exported builds stay on this machine only
+/signing/
+/releases/

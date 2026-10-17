@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -14,10 +16,31 @@ android {
         targetSdk = 36
         versionCode = 4
         versionName = "0.4.0"
+    }
 
-        // Phones and emulators that matter; 32-bit x86 devices are effectively extinct.
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+    // Release signing reads keystore.properties (never committed; the key lives outside the repo).
+    // Without it, release builds come out unsigned.
+    val keystoreProps = rootProject.file("keystore.properties").takeIf { it.exists() }
+        ?.let { file -> Properties().apply { file.inputStream().use(::load) } }
+    signingConfigs {
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
+    // mpv/FFmpeg ship as native libraries per CPU type; one APK per ABI keeps downloads small,
+    // plus a universal APK for anyone unsure which to pick. 32-bit x86 devices are effectively extinct.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
         }
     }
 
@@ -27,6 +50,7 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
