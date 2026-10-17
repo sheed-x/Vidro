@@ -2,7 +2,7 @@
 
 A fast, private video player for Android: offline by design, with no ads and no tracking.
 
-**مشغّل فيديو سريع وخاص لأندرويد، يعمل بدون إنترنت، وبدون إعلانات أو تتبّع.**
+
 
 ## Features
 
