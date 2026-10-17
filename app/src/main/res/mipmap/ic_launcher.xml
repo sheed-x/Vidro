@@ -1,0 +1,21 @@
+<!-- Android 7.x has no adaptive icons: a self-contained white rounded square with the same mark. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#DDE3EC"
+        android:strokeWidth="1.5"
+        android:pathData="M30,4 L78,4 Q104,4 104,30 L104,78 Q104,104 78,104 L30,104 Q4,104 4,78 L4,30 Q4,4 30,4 Z" />
+    <path
+        android:fillColor="#EAF0F8"
+        android:pathData="M54,20 A34,34 0 1,1 53.99,20 Z" />
+    <path
+        android:fillColor="#1B355A"
+        android:strokeColor="#1B355A"
+        android:strokeWidth="8"
+        android:strokeLineJoin="round"
+        android:pathData="M46,39 L69,54 L46,69 Z" />
+</vector>

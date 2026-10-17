@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Soft disc: a barely-there tint so the mark has a shape to sit in on white. -->
+    <path
+        android:fillColor="#EAF0F8"
+        android:pathData="M54,24 A30,30 0 1,1 53.99,24 Z" />
+    <!-- Play mark, rounded corners via round stroke joins; optically centred (shifted right). -->
+    <path
+        android:fillColor="#1B355A"
+        android:strokeColor="#1B355A"
+        android:strokeWidth="7"
+        android:strokeLineJoin="round"
+        android:pathData="M47,41 L67,54 L47,67 Z" />
+</vector>
