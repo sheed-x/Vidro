@@ -122,7 +122,9 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
             // Cheap scalers and no extra GPU passes: the quality-oriented defaults dropped frames
             // when downscaling 4K, especially in the small picture-in-picture window.
             setOptionString("profile", "fast")
-            setOptionString("vo", "gpu")
+            // No surface yet: a file loaded before the SurfaceView exists would fail to open a GPU
+            // output and mpv would drop the video track for good. attachSurface switches to gpu.
+            setOptionString("vo", "null")
             setOptionString("gpu-context", "android")
             setOptionString("opengl-es", "yes")
             setOptionString("hwdec", DecoderMode.Hardware.mpvValue)
@@ -184,6 +186,8 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
         mpv.attachSurface(surface)
         mpv.setOptionString("force-window", "yes")
         mpv.setPropertyString("vo", "gpu")
+        // A video output that failed earlier leaves the picture deselected; bring it back.
+        if (property("vid") == "no") mpv.setPropertyString("vid", "auto")
     }
 
     fun resizeSurface(width: Int, height: Int) {
