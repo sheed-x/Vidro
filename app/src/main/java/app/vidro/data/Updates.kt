@@ -158,9 +158,16 @@ class UpdateRepository(private val context: Context) {
         if (connection.responseCode == 404) return@withContext null
         val body = connection.inputStream.bufferedReader().use { it.readText() }
         val json = Json.parseToJsonElement(body).jsonObject
-        val asset = json["assets"]?.jsonArray
+        val apks = json["assets"]?.jsonArray
             ?.map { it.jsonObject }
-            ?.firstOrNull { it.string("name")?.endsWith(".apk") == true }
+            ?.filter { it.string("name")?.endsWith(".apk") == true }
+            .orEmpty()
+        // Releases ship one APK per CPU type plus a universal one: take the build for this device's
+        // preferred ABI, falling back to the universal APK.
+        val asset = Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi ->
+            apks.firstOrNull { it.string("name")?.endsWith("-$abi.apk") == true }
+        } ?: apks.firstOrNull { it.string("name")?.endsWith("-universal.apk") == true }
+            ?: apks.firstOrNull()
             ?: return@withContext null
         AppUpdate(
             version = json.string("tag_name").orEmpty().removePrefix("v"),
