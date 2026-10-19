@@ -15,6 +15,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import androidx.media.session.MediaButtonReceiver
+import app.vidro.MainActivity
 import app.vidro.R
 
 /**
@@ -63,10 +64,12 @@ class PlaybackService : Service() {
     private fun buildNotification(controller: PlayerController): android.app.Notification {
         ensureChannel(this)
         val paused = controller.engine.state.value.paused
+        // Listening opens the music screen; a video in the background goes back to its player.
+        val target = if (controller.audioOnly.value) MainActivity.nowPlayingIntent(this)
+        else Intent(this, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_REATTACH, true)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val open = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_REATTACH, true)
-                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            this, if (controller.audioOnly.value) 1 else 0, target,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         fun action(icon: Int, title: Int, command: Long) = NotificationCompat.Action(
@@ -75,7 +78,8 @@ class PlaybackService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(controller.currentItem.title)
-            .setContentText(getString(R.string.app_name))
+            .setContentText(controller.currentItem.artist ?: getString(R.string.app_name))
+            .setLargeIcon(controller.artwork.value)
             .setContentIntent(open)
             .setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_STOP))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

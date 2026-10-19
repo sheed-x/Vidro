@@ -31,11 +31,15 @@ import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -111,6 +115,11 @@ fun rememberPlayVideo(viewModel: LibraryViewModel): (Video) -> Unit {
         }
     }
 }
+
+/** Watch or listen to a video; offered in its info sheet. Provided by the app root. */
+class VideoActions(val play: (Video) -> Unit, val listen: (Video) -> Unit)
+
+val LocalVideoActions = compositionLocalOf<VideoActions?> { null }
 
 /** Space the floating tab bar covers at the bottom; lists pad by it so their end stays reachable. */
 val LocalBottomBarSpace = compositionLocalOf { 0.dp }
@@ -559,6 +568,7 @@ private fun SortField.label() = when (this) {
     SortField.Size -> R.string.sort_size
     SortField.Duration -> R.string.sort_duration
     SortField.Count -> R.string.sort_count
+    SortField.Artist -> R.string.sort_artist
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -583,6 +593,30 @@ fun VideoInfoSheet(video: Video, onDismiss: () -> Unit) {
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
+            LocalVideoActions.current?.let { actions ->
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = { onDismiss(); actions.play(video) },
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.weight(1f).height(52.dp),
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.player_play))
+                    }
+                    FilledTonalButton(
+                        onClick = { onDismiss(); actions.listen(video) },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        modifier = Modifier.weight(1f).height(52.dp),
+                    ) {
+                        Icon(Icons.Rounded.Headphones, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.play_as_audio), maxLines = 1)
+                    }
+                }
+            }
             Spacer(Modifier.height(8.dp))
             InfoRow(R.string.info_location, video.folderPath)
             InfoRow(R.string.info_size, formatSize(context, video.size))
@@ -611,7 +645,12 @@ private fun InfoRow(label: Int, value: String) {
 }
 
 @Composable
-fun EmptyState(title: String, body: String?, modifier: Modifier = Modifier) {
+fun EmptyState(
+    title: String,
+    body: String?,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.VideoLibrary,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -625,7 +664,7 @@ fun EmptyState(title: String, body: String?, modifier: Modifier = Modifier) {
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             Icon(
-                Icons.Rounded.VideoLibrary,
+                icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(40.dp),

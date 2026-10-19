@@ -371,4 +371,56 @@
     <string name="update_up_to_date_body">Vidro %1$s is the latest version.</string>
     <string name="update_failed">Couldn\'t check for updates</string>
     <string name="update_failed_body">Check your connection and try again.</string>
+
+    <!-- Music -->
+    <string name="tab_music">Music</string>
+    <string name="play_as_audio">Play as audio</string>
+    <string name="scrub_half">Half-speed scrubbing</string>
+    <string name="scrub_fine">Fine scrubbing</string>
+    <string name="sort_artist">Artist</string>
+    <string name="music_songs">Songs</string>
+    <string name="music_albums">Albums</string>
+    <string name="music_artists">Artists</string>
+    <string name="shuffle_all">Shuffle</string>
+    <string name="play_all">Play</string>
+    <string name="unknown_artist">Unknown artist</string>
+    <string name="unknown_album">Unknown album</string>
+    <string name="music_empty_title">No music yet</string>
+    <string name="music_empty_body">Songs saved on your phone show up here.</string>
+    <string name="music_access_title">Allow access to your music</string>
+    <string name="music_access_body">Vidro reads the songs on this phone only to play them. Nothing leaves your device.</string>
+    <string name="music_access_action">Allow</string>
+    <string name="recently_played">Recently played</string>
+    <string name="now_playing">Now playing</string>
+    <string name="playing_video_as_audio">Video · playing as audio</string>
+    <string name="watch_video">Watch video</string>
+    <string name="up_next">Up next</string>
+    <string name="play_next">Play next</string>
+    <string name="add_to_queue">Add to queue</string>
+    <string name="added_to_queue">Added to queue</string>
+    <string name="will_play_next">Plays next</string>
+    <string name="go_to_album">Go to album</string>
+    <string name="go_to_artist">Go to artist</string>
+    <string name="stop_playback">Stop playback</string>
+    <string name="remove_from_queue">Remove from queue</string>
+    <string name="song_details">Details</string>
+    <string name="sleep_end_track">End of track</string>
+    <string name="settings_music">Music</string>
+    <string name="music_skip_short">Skip short clips</string>
+    <string name="music_skip_short_desc">Keep voice notes and clips under 30 seconds out of Music</string>
+    <string name="music_rescan">Rescan music</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="more_options">More options</string>
+    <string name="info_album">Album</string>
+    <string name="info_artist">Artist</string>
+    <string name="info_year">Year</string>
+    <plurals name="song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
+    <plurals name="album_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d albums</item>
+    </plurals>
 </resources>

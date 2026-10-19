@@ -25,6 +25,14 @@ object StorageAccess {
     fun hasAnyAccess(context: Context): Boolean =
         hasFullAccess(context) || granted(context, videoOnlyPermissions().first())
 
+    /** Can read the music library (songs come from MediaStore's audio index). */
+    fun hasAudioAccess(context: Context): Boolean = hasFullAccess(context) || granted(context, audioPermission())
+
+    /** The runtime permission that opens up the audio index on this Android version. */
+    fun audioPermission(): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_AUDIO
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+
     /** Runtime permissions for the "videos only" path (or the only path before Android 11). */
     fun videoOnlyPermissions(): Array<String> = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(Manifest.permission.READ_MEDIA_VIDEO)

@@ -43,7 +43,9 @@ import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
@@ -269,6 +271,34 @@ fun SettingsScreen(viewModel: LibraryViewModel, onOpenAbout: () -> Unit = {}) {
                                 trailing = if (StorageAccess.usesAllFilesSettings) {
                                     { Chevron() }
                                 } else null,
+                            )
+                        },
+                    ),
+                )
+            }
+
+            item {
+                Group(
+                    title = stringResource(R.string.settings_music),
+                    rows = listOf(
+                        {
+                            SwitchRow(
+                                title = stringResource(R.string.music_skip_short),
+                                summary = stringResource(R.string.music_skip_short_desc),
+                                icon = Icons.Rounded.GraphicEq,
+                                checked = settings.musicSkipShort,
+                                onChange = { viewModel.setMusicSkipShort(it) },
+                            )
+                        },
+                        {
+                            GroupRow(
+                                title = stringResource(R.string.music_rescan),
+                                summary = stringResource(R.string.rescan_desc),
+                                icon = Icons.Rounded.LibraryMusic,
+                                onClick = {
+                                    viewModel.rescanMusic()
+                                    Toast.makeText(context, R.string.rescan_done, Toast.LENGTH_SHORT).show()
+                                },
                             )
                         },
                     ),

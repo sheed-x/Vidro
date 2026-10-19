@@ -15,6 +15,8 @@ import app.vidro.data.VideoFolder
 import app.vidro.data.ViewMode
 import app.vidro.data.sortedFolders
 import app.vidro.data.sortedVideos
+import app.vidro.player.PlayItem
+import app.vidro.player.PlayerHolder
 import app.vidro.player.PlayerSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -107,6 +109,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         return paths to paths.indexOf(video.path).coerceAtLeast(0)
     }
 
+    /** Plays [video] and the rest of its folder as sound only, for the music screen and a locked phone. */
+    fun playAsAudio(video: Video) {
+        val folder = library.value.folders.firstOrNull { it.path == video.folderPath }
+        val videos = folder?.videos?.sortedVideos(settings.value.videoSort) ?: listOf(video)
+        val items = videos.map { PlayItem(it.path, it.title, durationMs = it.durationMs) }
+        PlayerHolder.start(app, items, videos.indexOfFirst { it.path == video.path }.coerceAtLeast(0), audioOnly = true)
+    }
+
     fun folderName(path: String): String =
         library.value.folders.firstOrNull { it.path == path }?.name ?: path.substringAfterLast('/')
 
@@ -140,6 +150,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun setHomeShelf(shelf: HomeShelf) = viewModelScope.launch { app.settings.setHomeShelf(shelf) }
     fun setMotionEffects(enabled: Boolean) = viewModelScope.launch { app.settings.setMotionEffects(enabled) }
     fun setCheckUpdates(enabled: Boolean) = viewModelScope.launch { app.settings.setCheckUpdates(enabled) }
+    fun setMusicSkipShort(enabled: Boolean) = viewModelScope.launch { app.settings.setMusicSkipShort(enabled) }
+    fun rescanMusic() = app.music.refresh()
     val updates get() = app.updates
 
     /** The launch-time check, run once the stored setting is known. */

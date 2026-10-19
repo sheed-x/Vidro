@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Flip
 import androidx.compose.material.icons.rounded.FontDownload
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.List
@@ -101,6 +102,8 @@ class PanelActions(
     val close: () -> Unit,
     val back: () -> Unit,
     val enterPip: (() -> Unit)?,
+    /** Keep only the sound and continue in the music screen (works with the screen locked). */
+    val listen: () -> Unit,
     val kidsLock: () -> Unit,
     val toast: (String) -> Unit,
 )
@@ -161,6 +164,7 @@ private fun MorePanel(controller: PlayerController, actions: PanelActions) {
     val failed = stringResource(R.string.screenshot_failed)
 
     val tiles = buildList<@Composable (Modifier) -> Unit> {
+        add { m -> ToolTile(Icons.Rounded.Headphones, stringResource(R.string.play_as_audio), m) { actions.listen() } }
         add { m -> ToolTile(Icons.Rounded.Bedtime, stringResource(R.string.panel_sleep), m, active = sleepAt != null || sleepAtEnd) { actions.open(Panel.Sleep) } }
         add { m ->
             ToolTile(Icons.Rounded.PhotoCamera, stringResource(R.string.screenshot), m) {
@@ -766,7 +770,7 @@ private fun channelLabel(count: Int): String = when (count) {
 }
 
 @Composable
-private fun presetName(key: String): String = stringResource(
+fun presetName(key: String): String = stringResource(
     when (key) {
         "flat" -> R.string.preset_flat
         "bass" -> R.string.preset_bass

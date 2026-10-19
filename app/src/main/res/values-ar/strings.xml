@@ -373,4 +373,64 @@
     <string name="update_up_to_date_body">Vidro %1$s هو أحدث إصدار.</string>
     <string name="update_failed">تعذّر البحث عن تحديثات</string>
     <string name="update_failed_body">تحقّق من الاتصال وحاول مرة أخرى.</string>
+
+    <!-- Music -->
+    <string name="tab_music">الموسيقى</string>
+    <string name="play_as_audio">تشغيل كصوت</string>
+    <string name="scrub_half">تمرير بنصف السرعة</string>
+    <string name="scrub_fine">تمرير دقيق</string>
+    <string name="sort_artist">الفنان</string>
+    <string name="music_songs">الأغاني</string>
+    <string name="music_albums">الألبومات</string>
+    <string name="music_artists">الفنانون</string>
+    <string name="shuffle_all">عشوائي</string>
+    <string name="play_all">تشغيل</string>
+    <string name="unknown_artist">فنان غير معروف</string>
+    <string name="unknown_album">ألبوم غير معروف</string>
+    <string name="music_empty_title">لا توجد موسيقى بعد</string>
+    <string name="music_empty_body">ستظهر هنا الأغاني المحفوظة على هاتفك.</string>
+    <string name="music_access_title">اسمح بالوصول إلى موسيقاك</string>
+    <string name="music_access_body">يقرأ Vidro الأغاني الموجودة على هذا الهاتف لتشغيلها فقط، ولا يخرج أي شيء من جهازك.</string>
+    <string name="music_access_action">سماح</string>
+    <string name="recently_played">شُغّل مؤخراً</string>
+    <string name="now_playing">قيد التشغيل</string>
+    <string name="playing_video_as_audio">فيديو · يعمل كصوت</string>
+    <string name="watch_video">مشاهدة الفيديو</string>
+    <string name="up_next">التالي</string>
+    <string name="play_next">تشغيل كالتالي</string>
+    <string name="add_to_queue">إضافة إلى قائمة التشغيل</string>
+    <string name="added_to_queue">أُضيف إلى قائمة التشغيل</string>
+    <string name="will_play_next">سيُشغَّل تالياً</string>
+    <string name="go_to_album">الانتقال إلى الألبوم</string>
+    <string name="go_to_artist">الانتقال إلى الفنان</string>
+    <string name="stop_playback">إيقاف التشغيل</string>
+    <string name="remove_from_queue">إزالة من قائمة التشغيل</string>
+    <string name="song_details">التفاصيل</string>
+    <string name="sleep_end_track">نهاية المقطع</string>
+    <string name="settings_music">الموسيقى</string>
+    <string name="music_skip_short">تخطي المقاطع القصيرة</string>
+    <string name="music_skip_short_desc">إبعاد الرسائل الصوتية والمقاطع الأقصر من 30 ثانية عن الموسيقى</string>
+    <string name="music_rescan">إعادة فحص الموسيقى</string>
+    <string name="duration_hours_minutes">%1$d س %2$d د</string>
+    <string name="duration_minutes">%1$d د</string>
+    <string name="more_options">خيارات أخرى</string>
+    <string name="info_album">الألبوم</string>
+    <string name="info_artist">الفنان</string>
+    <string name="info_year">السنة</string>
+    <plurals name="song_count">
+        <item quantity="zero">لا أغاني</item>
+        <item quantity="one">أغنية واحدة</item>
+        <item quantity="two">أغنيتان</item>
+        <item quantity="few">%d أغانٍ</item>
+        <item quantity="many">%d أغنية</item>
+        <item quantity="other">%d أغنية</item>
+    </plurals>
+    <plurals name="album_count">
+        <item quantity="zero">لا ألبومات</item>
+        <item quantity="one">ألبوم واحد</item>
+        <item quantity="two">ألبومان</item>
+        <item quantity="few">%d ألبومات</item>
+        <item quantity="many">%d ألبوماً</item>
+        <item quantity="other">%d ألبوم</item>
+    </plurals>
 </resources>

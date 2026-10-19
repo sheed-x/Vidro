@@ -18,7 +18,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -74,8 +73,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -109,6 +106,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.vidro.R
+import app.vidro.ui.components.SeekBar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -134,7 +132,7 @@ private enum class DragMode { Seek, Brightness, Volume, Ignore }
 private enum class LockMode { None, Locked, Kids }
 
 @Composable
-fun PlayerScreen(controller: PlayerController, inPip: Boolean, onBack: () -> Unit, onEnterPip: (() -> Unit)?) {
+fun PlayerScreen(controller: PlayerController, inPip: Boolean, onBack: () -> Unit, onEnterPip: (() -> Unit)?, onListen: () -> Unit) {
     // Panels speak the app's language; the video surface, timeline and gestures stay physically
     // left-to-right in every language, as in all video players.
     val appDirection = LocalLayoutDirection.current
@@ -143,14 +141,20 @@ fun PlayerScreen(controller: PlayerController, inPip: Boolean, onBack: () -> Uni
         // drawing to a dead surface (black window). Only the overlays come and go.
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             VideoSurface(controller.engine)
-            if (!inPip) PlayerContent(controller, appDirection, onBack, onEnterPip)
+            if (!inPip) PlayerContent(controller, appDirection, onBack, onEnterPip, onListen)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlayerContent(controller: PlayerController, appDirection: LayoutDirection, onBack: () -> Unit, onEnterPip: (() -> Unit)?) {
+private fun PlayerContent(
+    controller: PlayerController,
+    appDirection: LayoutDirection,
+    onBack: () -> Unit,
+    onEnterPip: (() -> Unit)?,
+    onListen: () -> Unit,
+) {
     val engine = controller.engine
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -195,6 +199,7 @@ private fun PlayerContent(controller: PlayerController, appDirection: LayoutDire
             close = { panelStack = emptyList() },
             back = { panelStack = panelStack.dropLast(1) },
             enterPip = onEnterPip?.let { pip -> { panelStack = emptyList(); pip() } },
+            listen = { panelStack = emptyList(); onListen() },
             kidsLock = {
                 panelStack = emptyList()
                 lock = LockMode.Kids
@@ -311,12 +316,13 @@ private fun PlayerContent(controller: PlayerController, appDirection: LayoutDire
                                 touch()
                             },
                             onDragEnd = {
-                                if (mode == DragMode.Seek) engine.seekTo(lastTarget, precise = true)
+                                if (mode == DragMode.Seek) engine.endScrub(lastTarget)
                                 mode = null
                                 scrubTarget = null
                                 feedback = null
                             },
                             onDragCancel = {
+                                if (mode == DragMode.Seek) engine.endScrub(lastTarget)
                                 mode = null
                                 scrubTarget = null
                                 feedback = null
@@ -329,6 +335,10 @@ private fun PlayerContent(controller: PlayerController, appDirection: LayoutDire
                                         abs(total.x) > abs(total.y) -> if (settings.gestureSeek) DragMode.Seek else DragMode.Ignore
                                         change.position.x < widthPx / 2 -> if (settings.gestureBrightness) DragMode.Brightness else DragMode.Ignore
                                         else -> if (settings.gestureVolume) DragMode.Volume else DragMode.Ignore
+                                    }
+                                    if (mode == DragMode.Seek) {
+                                        lastTarget = startPos
+                                        engine.beginScrub()
                                     }
                                 }
                                 when (mode) {
@@ -431,14 +441,16 @@ private fun PlayerContent(controller: PlayerController, appDirection: LayoutDire
                 onPlayPause = { engine.togglePause(); touch() },
                 onPrevious = { controller.previous(); touch() },
                 onNext = { controller.next(); touch() },
+                onScrubStart = { engine.beginScrub() },
                 onScrub = { target ->
                     scrubTarget = target
                     engine.scrubTo(target)
                     touch()
                 },
-                onScrubEnd = {
-                    scrubTarget?.let { engine.seekTo(it, precise = true) }
+                onScrubEnd = { target, fine ->
+                    engine.endScrub(target, fine)
                     scrubTarget = null
+                    touch()
                 },
                 onToggleRemaining = { showRemaining = !showRemaining },
                 onSubtitles = { actions.open(Panel.Subtitles) },
@@ -623,8 +635,9 @@ private fun Controls(
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onScrubStart: () -> Unit,
     onScrub: (Double) -> Unit,
-    onScrubEnd: () -> Unit,
+    onScrubEnd: (Double, Boolean) -> Unit,
     onToggleRemaining: () -> Unit,
     onSubtitles: () -> Unit,
     onAudio: () -> Unit,
@@ -713,31 +726,16 @@ private fun Controls(
             val position = (scrubTarget ?: state.positionSec).coerceIn(0.0, duration)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TimeText(formatTime(position))
-                Box(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Slider(
-                        value = position.toFloat(),
-                        onValueChange = { onScrub(it.toDouble()) },
-                        onValueChangeFinished = onScrubEnd,
-                        valueRange = 0f..duration.toFloat().coerceAtLeast(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.28f),
-                        ),
-                    )
-                    // Chapter (white) and bookmark (accent) marks just under the track.
-                    if (duration > 0 && (markers.first.isNotEmpty() || markers.second.isNotEmpty())) {
-                        val accent = MaterialTheme.colorScheme.primary
-                        Canvas(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(6.dp).padding(horizontal = 10.dp)) {
-                            markers.first.forEach { t ->
-                                drawCircle(Color.White.copy(alpha = 0.7f), radius = 2.dp.toPx(), center = Offset((t / duration).toFloat() * size.width, size.height / 2))
-                            }
-                            markers.second.forEach { t ->
-                                drawCircle(accent, radius = 3.dp.toPx(), center = Offset((t / duration).toFloat() * size.width, size.height / 2))
-                            }
-                        }
-                    }
-                }
+                SeekBar(
+                    position = position,
+                    duration = duration,
+                    onScrubStart = onScrubStart,
+                    onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
+                    markers = markers.first,
+                    highlights = markers.second,
+                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                )
                 TimeText(
                     if (showRemaining) "-" + formatTime(duration - position) else formatTime(duration),
                     modifier = Modifier.clickable(onClick = onToggleRemaining),

@@ -16,7 +16,7 @@ enum class ViewMode { List, Grid }
 /** What the horizontal shelf on Home shows. */
 enum class HomeShelf { ContinueWatching, RecentlyAdded, Off }
 
-enum class SortField { Name, Date, Size, Duration, Count }
+enum class SortField { Name, Date, Size, Duration, Count, Artist }
 
 data class SortOrder(val field: SortField, val ascending: Boolean)
 
@@ -42,6 +42,9 @@ data class LibrarySettings(
     val motionEffects: Boolean = true,
     /** Ask GitHub for a newer release when the app starts. */
     val checkUpdates: Boolean = true,
+    val musicSort: SortOrder = SortOrder(SortField.Name, ascending = true),
+    /** Leaves voice notes and other clips under 30 seconds out of the music library. */
+    val musicSkipShort: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -73,6 +76,11 @@ class SettingsRepository(context: Context) {
             homeShelf = p.enum(HOME_SHELF, defaults.homeShelf),
             motionEffects = p[MOTION] ?: defaults.motionEffects,
             checkUpdates = p[CHECK_UPDATES] ?: defaults.checkUpdates,
+            musicSort = SortOrder(
+                p.enum(MUSIC_SORT, defaults.musicSort.field),
+                p[MUSIC_ASC] ?: defaults.musicSort.ascending,
+            ),
+            musicSkipShort = p[MUSIC_SKIP_SHORT] ?: defaults.musicSkipShort,
         )
     }
 
@@ -141,6 +149,17 @@ class SettingsRepository(context: Context) {
         store.edit { it[CHECK_UPDATES] = enabled }
     }
 
+    suspend fun setMusicSort(order: SortOrder) {
+        store.edit {
+            it[MUSIC_SORT] = order.field.name
+            it[MUSIC_ASC] = order.ascending
+        }
+    }
+
+    suspend fun setMusicSkipShort(enabled: Boolean) {
+        store.edit { it[MUSIC_SKIP_SHORT] = enabled }
+    }
+
     private inline fun <reified E : Enum<E>> Preferences.enum(key: Preferences.Key<String>, default: E): E =
         this[key]?.let { name -> enumValues<E>().firstOrNull { it.name == name } } ?: default
 
@@ -161,5 +180,8 @@ class SettingsRepository(context: Context) {
         val HOME_SHELF = stringPreferencesKey("home_shelf")
         val MOTION = booleanPreferencesKey("motion_effects")
         val CHECK_UPDATES = booleanPreferencesKey("check_updates")
+        val MUSIC_SORT = stringPreferencesKey("music_sort")
+        val MUSIC_ASC = booleanPreferencesKey("music_sort_asc")
+        val MUSIC_SKIP_SHORT = booleanPreferencesKey("music_skip_short")
     }
 }

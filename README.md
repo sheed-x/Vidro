@@ -39,8 +39,15 @@ Offline by design. No ads, no tracking, no accounts.
 - **170+ formats:** MKV, MP4, AVI, WMV, RMVB, FLV, WebM, TS, MOV and more, powered by mpv and FFmpeg
 - **Hardware and software decoding:** H.264, HEVC, VP9 and AV1 up to 4K, with automatic fallback
 - **Gestures:** seek, brightness, volume, pinch to zoom, double tap to skip, hold for 2× speed
+- **Smooth timeline:** the thumb stays under your finger, a time bubble shows where you'll land, and sliding your finger up off the bar scrubs at half or quarter speed for precise positioning
 - **Picture-in-picture and background play,** with media controls in the notification
 - **Tools:** sleep timer, screenshots, bookmarks, play queue, repeat and shuffle, mirror and flip, custom aspect ratios
+
+### Music
+- A Music tab with your songs, albums and artists, plus recently played
+- A full now-playing screen: big cover over its own blurred colours, shuffle, repeat, speed, sleep timer, equalizer presets and an editable queue
+- **Play any video as audio,** with the screen off or the phone locked, and switch back to the picture any time
+- Lock screen and notification controls with artwork, a mini player above the tab bar, and audio files open straight from your file manager
 
 ### Subtitles and audio
 - SRT, ASS/SSA, VTT, SUB, SMI and embedded tracks, two subtitles at once
@@ -55,16 +62,11 @@ Offline by design. No ads, no tracking, no accounts.
 
 ## Download
 
-Grab an APK from the [latest release](https://github.com/sheed-x/Vidro/releases/latest):
+Grab `Vidro-<version>-arm64-v8a.apk` from the [latest release](https://github.com/sheed-x/Vidro/releases/latest).
+It runs on almost every phone from the last few years. Builds for older 32-bit phones, emulators and a
+universal APK are in [v0.4.0](https://github.com/sheed-x/Vidro/releases/tag/v0.4.0).
 
-| File | For |
-| --- | --- |
-| `Vidro-<version>-arm64-v8a.apk` | Almost every phone from the last few years. **Pick this one if unsure.** |
-| `Vidro-<version>-armeabi-v7a.apk` | Older 32-bit phones |
-| `Vidro-<version>-x86_64.apk` | Emulators and Chromebooks |
-| `Vidro-<version>-universal.apk` | Any device (larger download) |
-
-Checksums are in `SHA256SUMS.txt`. Once installed, Vidro can tell you about new releases and update itself.
+Checksums are in `SHA256SUMS.txt`. Once installed, Vidro tells you about new releases and updates itself.
 
 ## Privacy
 

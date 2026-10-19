@@ -28,16 +28,15 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import app.vidro.MainActivity
 import app.vidro.R
 import app.vidro.VidroApp
 import app.vidro.ui.theme.VidroTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import java.io.File
 
 class PlayerActivity : AppCompatActivity() {
@@ -82,6 +81,7 @@ class PlayerActivity : AppCompatActivity() {
                     inPip = pip,
                     onBack = { finish() },
                     onEnterPip = if (pipSupported) ({ enterPip() }) else null,
+                    onListen = ::listenOnly,
                 )
             }
         }
@@ -130,11 +130,16 @@ class PlayerActivity : AppCompatActivity() {
         return createController(items, start)
     }
 
-    private fun createController(items: List<PlayItem>, start: Int): PlayerController {
-        val app = application as VidroApp
-        // A few milliseconds: the engine needs subtitle fonts/encoding before it starts.
-        val settings = runBlocking { app.playerSettings.settings.first() }
-        return PlayerController(app, app.history, app.playerSettings, settings, items, start).also { PlayerHolder.replace(it) }
+    private fun createController(items: List<PlayItem>, start: Int): PlayerController =
+        PlayerHolder.start(application as VidroApp, items, start)
+
+    /** "Play as audio": the session carries on as sound only and the music screen takes over. */
+    private fun listenOnly() {
+        val c = controller ?: return
+        c.setAudioOnly(true)
+        c.engine.setPaused(false)
+        startActivity(MainActivity.nowPlayingIntent(this))
+        finish()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -168,8 +173,9 @@ class PlayerActivity : AppCompatActivity() {
         runCatching { unregisterReceiver(pipReceiver) }
         controller?.let { c ->
             c.detachActivity(this)
-            // Back / swipe-away ends playback; a system-initiated destroy keeps the session alive.
-            if (isFinishing) PlayerHolder.clear(c)
+            // Back / swipe-away ends playback, unless we only switched to listening; a
+            // system-initiated destroy keeps the session alive.
+            if (isFinishing && !c.audioOnly.value) PlayerHolder.clear(c)
         }
         controller = null
         PlayerKeys.handler = null
@@ -293,6 +299,12 @@ class PlayerActivity : AppCompatActivity() {
             Intent(context, PlayerActivity::class.java)
                 .putStringArrayListExtra(EXTRA_QUEUE, ArrayList(queue))
                 .putExtra(EXTRA_INDEX, index)
+
+        /** Back to the running session's video player (from the mini player or the music screen). */
+        fun reattachIntent(context: Context): Intent =
+            Intent(context, PlayerActivity::class.java)
+                .putExtra(EXTRA_REATTACH, true)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
         private fun titleOf(pathOrName: String) = pathOrName.substringAfterLast('/').substringBeforeLast('.')
     }

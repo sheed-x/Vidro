@@ -53,6 +53,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.vidro.ui.theme.LocalIsDark
 import dev.chrisbanes.haze.HazeState
@@ -111,6 +112,9 @@ fun FloatingTabBar(
     /** Minimised while content scrolls down: only the current tab's icon remains. */
     compact: Boolean = false,
     onExpand: () -> Unit = {},
+    /** Narrower tabs on small phones, so four tabs and the search button still fit. */
+    tabWidth: Dp = TabWidth,
+    selectedTabWidth: Dp = SelectedTabWidth,
 ) {
     val dark = LocalIsDark.current
     val haptics = LocalHapticFeedback.current
@@ -136,11 +140,11 @@ fun FloatingTabBar(
             val clamped = position.coerceIn(0f, (tabs.size - 1).toFloat())
             val stretch = sin(PI * (clamped - floor(clamped))).toFloat()
             val lensWidth by animateDpAsState(
-                if (compact) TabWidth else SelectedTabWidth + LensStretch * stretch,
+                if (compact) tabWidth else selectedTabWidth + LensStretch * stretch,
                 spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium),
                 label = "lens-width",
             )
-            val lensX = if (compact) 0.dp else TabWidth * clamped - LensStretch / 2 * stretch
+            val lensX = if (compact) 0.dp else tabWidth * clamped - LensStretch / 2 * stretch
             Box(
                 Modifier
                     // Tabs before the selected one are collapsed, so the lens sits at position × collapsed width.
@@ -163,6 +167,8 @@ fun FloatingTabBar(
                     tab = tab,
                     selected = index == selectedIndex,
                     compact = compact,
+                    tabWidth = tabWidth,
+                    selectedTabWidth = selectedTabWidth,
                     onClick = { if (compact) onExpand() else onSelect(index) },
                 )
             }
@@ -171,7 +177,7 @@ fun FloatingTabBar(
 }
 
 @Composable
-private fun Tab(tab: TabItem, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun Tab(tab: TabItem, selected: Boolean, compact: Boolean, tabWidth: Dp, selectedTabWidth: Dp, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val color by animateColorAsState(
@@ -181,9 +187,9 @@ private fun Tab(tab: TabItem, selected: Boolean, compact: Boolean, onClick: () -
     val width by animateDpAsState(
         when {
             compact && !selected -> 0.dp
-            compact -> TabWidth
-            selected -> SelectedTabWidth
-            else -> TabWidth
+            compact -> tabWidth
+            selected -> selectedTabWidth
+            else -> tabWidth
         },
         spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
         label = "tab-width",

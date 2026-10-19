@@ -187,7 +187,7 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
         mpv.setOptionString("force-window", "yes")
         mpv.setPropertyString("vo", "gpu")
         // A video output that failed earlier leaves the picture deselected; bring it back.
-        if (property("vid") == "no") mpv.setPropertyString("vid", "auto")
+        if (videoEnabled && property("vid") == "no") mpv.setPropertyString("vid", "auto")
     }
 
     fun resizeSurface(width: Int, height: Int) {
@@ -208,6 +208,8 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
     fun load(target: String, startSec: Double?, startPaused: Boolean = false) {
         if (released) return
         _state.update { PlayerState(speed = it.speed, volume = it.volume) }
+        heldPosition = null
+        pausedBeforeScrub = null
         mpv.setPropertyString("start", startSec?.let(::fmt) ?: "none")
         loadingFile = true
         mpv.command(arrayOf("loadfile", target, "replace"))
@@ -224,8 +226,78 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
     fun seekTo(seconds: Double, precise: Boolean = true) {
         if (released) return
         pendingScrub = null
+        val target = seconds.coerceAtLeast(0.0)
+        if (precise) holdPosition(target)
         val mode = if (precise) "absolute+exact" else "absolute+keyframes"
-        mpv.command(arrayOf("seek", fmt(seconds.coerceAtLeast(0.0)), mode))
+        mpv.command(arrayOf("seek", fmt(target), mode))
+    }
+
+    // A seek takes a moment to land; until it does mpv keeps reporting the old time, which made the
+    // timeline snap back to where the finger started and then jump forward again. The target is shown
+    // instead until playback restarts at the new place (or the seek gives up).
+    private var heldPosition: Double? = null
+    private var holdUntil = 0L
+
+    private fun holdPosition(target: Double) {
+        heldPosition = target
+        holdUntil = System.currentTimeMillis() + SEEK_HOLD_MS
+        _state.update { it.copy(positionSec = target) }
+    }
+
+    private fun reportedPosition(value: Double): Double {
+        val held = heldPosition ?: return value
+        if (kotlin.math.abs(value - held) < SEEK_LANDED_SEC || System.currentTimeMillis() > holdUntil) {
+            heldPosition = null
+            return value
+        }
+        return held
+    }
+
+    /** Playback restarted after a seek: show where it really landed (a keyframe may be a bit earlier). */
+    private fun releaseHold() {
+        if (heldPosition == null) return
+        heldPosition = null
+        val landed = runCatching { mpv.getPropertyDouble("time-pos") }.getOrNull() ?: return
+        _state.update { it.copy(positionSec = landed) }
+    }
+
+    private var pausedBeforeScrub: Boolean? = null
+
+    /** Dragging the timeline: playback holds still so every frame shown is the one under the finger. */
+    fun beginScrub() {
+        if (released || pausedBeforeScrub != null) return
+        pausedBeforeScrub = _state.value.paused
+        mpv.setPropertyBoolean("pause", true)
+    }
+
+    /**
+     * Lands on [seconds] and resumes playback if it was playing before the drag. Video lands on the
+     * nearest keyframe, which is instant: an exact landing has to decode every frame from the last
+     * keyframe and froze 4K60 files for seconds. [precise] (fine scrubbing) and audio land exactly.
+     */
+    fun endScrub(seconds: Double, precise: Boolean = false) {
+        if (released) return
+        val exact = precise || !videoEnabled || _state.value.videoWidth <= 0
+        if (exact) {
+            seekTo(seconds, precise = true)
+        } else {
+            pendingScrub = null
+            val target = seconds.coerceAtLeast(0.0)
+            holdPosition(target)
+            mpv.command(arrayOf("seek", fmt(target), "absolute+keyframes"))
+        }
+        val wasPaused = pausedBeforeScrub ?: return
+        pausedBeforeScrub = null
+        if (!wasPaused) mpv.setPropertyBoolean("pause", false)
+    }
+
+    private var videoEnabled = true
+
+    /** Audio-only listening: the picture isn't decoded at all, which saves the battery. */
+    fun setVideoEnabled(enabled: Boolean) {
+        if (released || videoEnabled == enabled) return
+        videoEnabled = enabled
+        mpv.setPropertyString("vid", if (enabled) "auto" else "no")
     }
 
     /**
@@ -458,7 +530,7 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
     override fun eventProperty(property: String, value: Double) {
         post {
             when (property) {
-                "time-pos" -> copy(positionSec = value, positionKnown = true)
+                "time-pos" -> copy(positionSec = reportedPosition(value), positionKnown = true)
                 "duration" -> copy(durationSec = value)
                 "speed" -> copy(speed = value)
                 "volume" -> copy(volume = value)
@@ -498,8 +570,10 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
         // failure only counts once the requested file has actually started.
         when (eventId) {
             MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> main.post {
+                if (released) return@post
                 seekInFlight = false
-                pendingScrub?.let { scrubTo(it) }
+                val next = pendingScrub
+                if (next != null) scrubTo(next) else releaseHold()
             }
             MpvEvent.MPV_EVENT_START_FILE -> main.post {
                 if (loadingFile) fileStarted = true
@@ -532,6 +606,11 @@ class MpvEngine(context: Context, fontsDir: String, defaultFont: String, subCode
     }
 
     private fun fmt(value: Double) = String.format(Locale.ROOT, "%.3f", value)
+
+    private companion object {
+        const val SEEK_HOLD_MS = 2_500L
+        const val SEEK_LANDED_SEC = 1.0
+    }
 
     private fun argb(color: Long) = String.format(Locale.ROOT, "#%08X", color and 0xFFFFFFFFL)
 }

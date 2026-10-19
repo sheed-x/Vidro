@@ -26,6 +26,9 @@ import androidx.core.content.ContextCompat
 import app.vidro.data.Bookmark
 import app.vidro.data.PlaybackEntry
 import app.vidro.data.PlaybackHistory
+import app.vidro.VidroApp
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -44,7 +47,15 @@ import java.io.File
 import kotlin.random.Random
 
 /** One entry of the play queue: a file path, or a content:// URI handed over by another app. */
-data class PlayItem(val target: String, val title: String) {
+data class PlayItem(
+    val target: String,
+    val title: String,
+    val artist: String? = null,
+    val album: String? = null,
+    /** A song or other audio file; it always plays in the music screen. */
+    val isAudio: Boolean = false,
+    val durationMs: Long = 0,
+) {
     val isContent: Boolean get() = target.startsWith("content://")
 }
 
@@ -66,8 +77,10 @@ class PlayerController(
     private val history: PlaybackHistory,
     private val settingsRepository: PlayerSettingsRepository,
     initialSettings: PlayerSettings,
-    val items: List<PlayItem>,
+    initialItems: List<PlayItem>,
     startIndex: Int,
+    /** Start a video as sound only (the music screen instead of the video player). */
+    startAudioOnly: Boolean = false,
 ) {
     private val fontsDir: File = SubtitleFonts.prepare(app)
 
@@ -83,7 +96,13 @@ class PlayerController(
     private val _settings = MutableStateFlow(initialSettings)
     val settings: StateFlow<PlayerSettings> = _settings.asStateFlow()
 
-    private val _index = MutableStateFlow(startIndex.coerceIn(0, items.lastIndex))
+    private val _queue = MutableStateFlow(initialItems)
+
+    /** The play queue; "Play next" and "Add to queue" grow it while playing. */
+    val queue: StateFlow<List<PlayItem>> = _queue.asStateFlow()
+    val items: List<PlayItem> get() = _queue.value
+
+    private val _index = MutableStateFlow(startIndex.coerceIn(0, initialItems.lastIndex))
     val index: StateFlow<Int> = _index.asStateFlow()
     val currentItem: PlayItem get() = items[_index.value]
 
@@ -130,8 +149,21 @@ class PlayerController(
     private val _bookmarks = MutableStateFlow<List<Bookmark>>(emptyList())
     val bookmarks: StateFlow<List<Bookmark>> = _bookmarks.asStateFlow()
 
+    /** Listening only: no picture is decoded, playback carries on with the screen off or locked. */
+    private val _audioOnly = MutableStateFlow(startAudioOnly || initialItems.getOrNull(startIndex)?.isAudio == true)
+    val audioOnly: StateFlow<Boolean> = _audioOnly.asStateFlow()
+
+    /** Whether the video player screen is showing this session (the mini player hides then). */
+    private val _screenAttached = MutableStateFlow(false)
+    val screenAttached: StateFlow<Boolean> = _screenAttached.asStateFlow()
+
+    /** Cover for the music screen, notification and lock screen: album art or a frame of the video. */
+    private val _artwork = MutableStateFlow<Bitmap?>(null)
+    val artwork: StateFlow<Bitmap?> = _artwork.asStateFlow()
+    private var artworkJob: Job? = null
+
     /** Called when playback should end and the player close (queue finished). */
-    var onQueueFinished: () -> Unit = {}
+    var onQueueFinished: () -> Unit = { PlayerHolder.clear(this) }
 
     val hasNext: Boolean get() = _shuffle.value && items.size > 1 || _index.value < items.lastIndex || _repeat.value == RepeatMode.All
     val hasPrevious: Boolean get() = _index.value > 0 || playedStack.isNotEmpty()
@@ -182,6 +214,7 @@ class PlayerController(
         engine.onLoadFailed = { _error.value = true }
         engine.onFileLoaded = ::onFileLoaded
         applyGlobalSettings(initialSettings)
+        engine.setVideoEnabled(!_audioOnly.value)
 
         scope.launch {
             settingsRepository.settings.drop(1).collect { new ->
@@ -207,6 +240,11 @@ class PlayerController(
                 .distinctUntilChanged()
                 .collect { applyOrientation() }
         }
+        // The notification / lock screen controls appear as soon as a file is open, not only after
+        // the first pause or resume.
+        scope.launch {
+            engine.state.map { it.loaded }.distinctUntilChanged().collect { updateService() }
+        }
         scope.launch {
             engine.state.map { it.paused }.distinctUntilChanged().collect { paused ->
                 if (paused) saveProgress() else requestAudioFocus()
@@ -226,17 +264,31 @@ class PlayerController(
 
     fun attachActivity(activity: Activity) {
         this.activity = activity
+        _screenAttached.value = true
         applyOrientation()
     }
 
     fun detachActivity(activity: Activity) {
-        if (this.activity === activity) this.activity = null
+        if (this.activity === activity) {
+            this.activity = null
+            _screenAttached.value = false
+            onQueueFinished = { PlayerHolder.clear(this) }
+        }
     }
 
-    /** Leaving the player screen: keep playing only if background play is on. */
+    /** Leaving the player screen: keep playing if background play is on or we're only listening. */
     fun onScreenHidden() {
         saveProgress()
-        if (!_settings.value.backgroundPlay) engine.setPaused(true)
+        if (!_settings.value.backgroundPlay && !_audioOnly.value) engine.setPaused(true)
+    }
+
+    /** Switches between watching and listening; songs are always listen-only. */
+    fun setAudioOnly(enabled: Boolean) {
+        val value = enabled || currentItem.isAudio
+        if (_audioOnly.value == value) return
+        _audioOnly.value = value
+        engine.setVideoEnabled(!value)
+        updateService()
     }
 
     // --- Queue ---
@@ -249,10 +301,12 @@ class PlayerController(
         _resumePrompt.value = null
         _bookmarks.value = emptyList()
         val item = items[position]
+        loadArtwork(item)
         scope.launch {
             val entry = withContext(Dispatchers.IO) { runCatching { history.load(item.target) }.getOrNull() }
-            val saved = entry?.resumePointSec()
-            val mode = _settings.value.resumeMode
+            // Songs start from the top; long recordings (podcasts, audiobooks) remember their place.
+            val saved = entry?.resumePointSec()?.takeIf { !item.isAudio || item.durationMs >= LONG_AUDIO_MS }
+            val mode = if (item.isAudio && _settings.value.resumeMode == ResumeMode.Ask) ResumeMode.Auto else _settings.value.resumeMode
             val start = if (mode == ResumeMode.Never) null else saved
             val target = withContext(Dispatchers.IO) { resolve(item) }
             if (target == null) {
@@ -316,6 +370,32 @@ class PlayerController(
         _index.value < items.lastIndex -> _index.value + 1
         _repeat.value == RepeatMode.All -> 0
         else -> null
+    }
+
+    /** Puts [added] right after the current item. */
+    fun playNext(added: List<PlayItem>) = insert(_index.value + 1, added)
+
+    /** Appends [added] to the end of the queue. */
+    fun addToQueue(added: List<PlayItem>) = insert(items.size, added)
+
+    private fun insert(at: Int, added: List<PlayItem>) {
+        if (added.isEmpty()) return
+        _queue.value = items.toMutableList().apply { addAll(at, added) }
+        if (_index.value >= at) _index.value += added.size
+        shiftHistory(at, added.size)
+    }
+
+    /** Takes an upcoming or earlier item out of the queue; the one playing stays. */
+    fun removeAt(position: Int) {
+        if (position == _index.value || position !in items.indices) return
+        _queue.value = items.toMutableList().apply { removeAt(position) }
+        if (position < _index.value) _index.value -= 1
+        playedStack.removeAll { it == position }
+        shiftHistory(position + 1, -1)
+    }
+
+    private fun shiftHistory(from: Int, by: Int) {
+        for (i in playedStack.indices) if (playedStack[i] >= from) playedStack[i] += by
     }
 
     fun cycleRepeat() {
@@ -599,6 +679,10 @@ class PlayerController(
         if (target != null) {
             playedStack.addLast(_index.value)
             load(target)
+        } else if (activity == null && _audioOnly.value) {
+            // Listening from the music screen: stop at the top of the last track instead of vanishing.
+            engine.setPaused(true)
+            engine.seekTo(0.0)
         } else {
             onQueueFinished()
         }
@@ -625,10 +709,11 @@ class PlayerController(
         }
     }
 
-    /** The foreground service only exists while background play is on and something is playing or paused mid-way. */
+    /** The foreground service only exists while playback may continue off-screen and something is loaded. */
     private fun updateService() {
         if (released) return
-        if (_settings.value.backgroundPlay && engine.state.value.loaded) PlaybackService.start(app) else PlaybackService.stop(app)
+        val offScreen = _settings.value.backgroundPlay || _audioOnly.value
+        if (offScreen && engine.state.value.loaded) PlaybackService.start(app) else PlaybackService.stop(app)
     }
 
     private fun publishSessionState() {
@@ -651,14 +736,37 @@ class PlayerController(
     }
 
     private fun publishMetadata() {
+        val item = currentItem
+        val art = _artwork.value
         session.setMetadata(
             MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentItem.title)
-                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, currentItem.title)
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, item.title)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, item.title)
+                .apply {
+                    item.artist?.let {
+                        putString(MediaMetadataCompat.METADATA_KEY_ARTIST, it)
+                        putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, it)
+                    }
+                    item.album?.let { putString(MediaMetadataCompat.METADATA_KEY_ALBUM, it) }
+                    // The lock screen and the notification show this as the background / cover.
+                    if (art != null) {
+                        putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
+                        putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, art)
+                    }
+                }
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, (engine.state.value.durationSec * 1000).toLong())
                 .build(),
         )
         PlaybackService.refresh()
+    }
+
+    private fun loadArtwork(item: PlayItem) {
+        artworkJob?.cancel()
+        _artwork.value = null
+        artworkJob = scope.launch {
+            _artwork.value = withContext(Dispatchers.IO) { Artwork.load(app, item) }
+            publishMetadata()
+        }
     }
 
     /** mpv can't open content:// URIs itself; hand it a file descriptor it will close when done. */
@@ -708,6 +816,7 @@ class PlayerController(
         private const val MIN_RESUME_MS = 5_000L
         private const val END_MARGIN_SEC = 5.0
         private const val RESTART_THRESHOLD_SEC = 5.0
+        private const val LONG_AUDIO_MS = 10 * 60_000L
 
         /** mpv slang list for a preferred subtitle language code. */
         fun slangFor(code: String): String = when (code) {
@@ -728,22 +837,35 @@ object PlayerSurface {
 
 /** Process-wide owner of the current player, so playback can outlive the activity. */
 object PlayerHolder {
-    var controller: PlayerController? = null
-        private set
+    private val _current = MutableStateFlow<PlayerController?>(null)
+
+    /** The running session, for the mini player and the music screen. */
+    val current: StateFlow<PlayerController?> = _current.asStateFlow()
+
+    val controller: PlayerController? get() = _current.value
+
+    /** Starts a new session (ending the current one) with the saved player settings. */
+    fun start(app: VidroApp, items: List<PlayItem>, index: Int, audioOnly: Boolean = false): PlayerController {
+        // A few milliseconds: the engine needs subtitle fonts/encoding before it starts.
+        val settings = runBlocking { app.playerSettings.settings.first() }
+        return PlayerController(app, app.history, app.playerSettings, settings, items, index, audioOnly).also(::replace)
+    }
 
     /** Starting a new video ends the previous session and closes its screen (e.g. an open PiP window). */
     fun replace(new: PlayerController?) {
-        controller?.let { old ->
+        _current.value?.let { old ->
+            // Cleared first so the old session's own "finished" hook can't end the new one.
+            _current.value = null
             old.onQueueFinished()
             old.release()
         }
-        controller = new
+        _current.value = new
     }
 
     fun clear(old: PlayerController) {
-        if (controller === old) {
+        if (_current.value === old) {
+            _current.value = null
             old.release()
-            controller = null
         }
     }
 }

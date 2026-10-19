@@ -43,7 +43,7 @@ fun List<VideoFolder>.sortedFolders(order: SortOrder): List<VideoFolder> {
         SortField.Date -> compareBy { it.lastModified }
         SortField.Size -> compareBy { it.totalSize }
         SortField.Count -> compareBy { it.videos.size }
-        SortField.Name, SortField.Duration -> Comparator { a, b -> NaturalOrder.compare(a.name, b.name) }
+        SortField.Name, SortField.Duration, SortField.Artist -> Comparator { a, b -> NaturalOrder.compare(a.name, b.name) }
     }
     return sortedWith(if (order.ascending) comparator else comparator.reversed())
 }
@@ -53,7 +53,7 @@ fun List<Video>.sortedVideos(order: SortOrder): List<Video> {
         SortField.Date -> compareBy { it.dateModified }
         SortField.Size -> compareBy { it.size }
         SortField.Duration -> compareBy { it.durationMs }
-        SortField.Name, SortField.Count -> Comparator { a, b -> NaturalOrder.compare(a.name, b.name) }
+        SortField.Name, SortField.Count, SortField.Artist -> Comparator { a, b -> NaturalOrder.compare(a.name, b.name) }
     }
     return sortedWith(if (order.ascending) comparator else comparator.reversed())
 }
